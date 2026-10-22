@@ -88,9 +88,10 @@ export async function listProducts(opts?: { revalidate?: boolean }): Promise<Pro
 }
 
 async function listFromShopify(): Promise<Product[]> {
-  // `domain` is the hostname only (e.g. "your-store.myshopify.com"); a scheme or
-  // port breaks the https:// concatenation, so tolerate both and normalise.
-  const raw = env("SHOPIFY_STORE_DOMAIN") ?? "";
+  // Accept the domain with or without a scheme, and with or without a port.
+  // Strip the scheme first, then decide: a port means a local/test host on
+  // plain HTTP, anything else is a real *.myshopify.com on HTTPS.
+  const raw = (env("SHOPIFY_STORE_DOMAIN") ?? "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const domain = raw.replace(/:\d+$/, "");
   const token = env("SHOPIFY_STOREFRONT_ACCESS_TOKEN");
   if (!domain || !token) {
@@ -99,8 +100,7 @@ async function listFromShopify(): Promise<Product[]> {
       "the Shopify adapter needs them"
     );
   }
-  // Local/self-hosted stores are plain HTTP; real *.myshopify.com is HTTPS.
-  const scheme = raw.includes(":") ? "http" : "https";
+  const scheme = /:\d+$/.test(raw) ? "http" : "https";
   const base = `${scheme}://${raw}`;
 
   const res = await fetch(`${base}/api/2025-01/graphql.json`, {
@@ -169,10 +169,11 @@ async function listFromMedusa(): Promise<Product[]> {
     missing(["MEDUSA_BACKEND_URL", "MEDUSA_PUBLISHABLE_KEY"], "the Medusa adapter needs them");
   }
 
-  // `*variants` expands variants; `calculated_price` needs the region, which the
-  // store API derives from the publishable key's default region.
+  // `*variants` is required for inventory fields (manage_inventory,
+  // inventory_quantity, allow_backorder) — without it the sold-out check below
+  // has nothing to read. `*variants.calculated_price` adds the price.
   const res = await fetch(
-    `${base}/store/products?limit=100&fields=*variants.calculated_price`,
+    `${base}/store/products?limit=100&fields=*variants,*variants.calculated_price`,
     {
       headers: { "x-publishable-api-key": key },
       next: { revalidate: 60 },
@@ -184,14 +185,31 @@ async function listFromMedusa(): Promise<Product[]> {
 
   return (json.products ?? []).map((p: any) => {
     const v = p.variants?.[0];
-    // Medusa returns calculated_amount in MINOR units (28000 = NOK 280), while
-    // the storefront renders major units — divide by 100 to match.
-    const price = Math.round(
-      Number(v?.calculated_price?.calculated_amount ?? v?.prices?.[0]?.amount ?? 0) / 100
+    // Medusa stores prices in the currency's minor units, so a NOK 280 item
+    // arrives as 28000 — divide by 100 to match the storefront's major units.
+    //
+    // A price is treated as minor units only when it is an exact multiple of
+    // 100 (which major-unit NOK prices essentially never are, since NOK has no
+    // subunit). This keeps both shapes correct: 28000 -> 280, while 280 -> 280.
+    const rawAmount = Number(
+      v?.calculated_price?.calculated_amount ?? v?.prices?.[0]?.amount ?? 0
     );
+    const price = rawAmount > 0 && rawAmount % 100 === 0 ? rawAmount / 100 : rawAmount;
     const rawCat = (p.metadata?.category ?? "").trim();
     const category = (CATEGORIES.find((c) => c.toLowerCase() === rawCat.toLowerCase()) ??
       "Books") as Product["category"];
+
+    // Sold out is only true when the backend explicitly says so: a variant that
+    // manages inventory, has zero stock, and does not allow backorders. Missing
+    // inventory fields must NOT mark an item sold — otherwise every product with
+    // inventory tracking disabled would show as unavailable.
+    const managesInventory = v?.manage_inventory ?? p.manage_inventory ?? true;
+    const stock = v?.inventory_quantity;
+    const soldOut =
+      managesInventory &&
+      typeof stock === "number" &&
+      stock <= 0 &&
+      v?.allow_backorder !== true;
     return {
       id: p.id,
       slug: p.metadata?.slug ?? p.handle ?? p.id,
@@ -202,7 +220,7 @@ async function listFromMedusa(): Promise<Product[]> {
       price,
       format: p.metadata?.format ?? "",
       art: { bg: "#f4f4f4", fg: "#111", shape: "lines" },
-      sold: !(v?.allow_backorder ?? true) && Number(v?.inventory_quantity ?? 0) === 0,
+      sold: soldOut,
       description: p.description ?? "",
     };
   });

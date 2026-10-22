@@ -27,7 +27,12 @@ export function CartProvider({
 }) {
   const [cart, setCart] = useState<Cart>({});
 
-  // Restored from localStorage on mount only; SSR must render the empty cart.
+  // `hydrated` gates the write-back effect. Without it, React StrictMode's
+  // double-invoked effects (dev only) would persist the empty initial cart over
+  // localStorage before the restore effect has read it — wiping the saved cart on
+  // every refresh. The write only happens once the restore has completed.
+  const [hydrated, setHydrated] = useState(false);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
@@ -35,15 +40,17 @@ export function CartProvider({
     } catch {
       /* corrupt or unavailable storage — start empty */
     }
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(cart));
     } catch {
       /* storage may be unavailable (private mode) */
     }
-  }, [cart]);
+  }, [cart, hydrated]);
 
   const value = useMemo(() => {
     const ids = Object.keys(cart);

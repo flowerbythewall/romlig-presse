@@ -42,10 +42,22 @@ export default function ShopClient({ products }: { products: Product[] }) {
     return { kind: "none" };
   }, [seg, products]);
 
-  const cat: Category | "All" = useMemo(() => {
+  // The category in the URL, when there is one. On a product overlay the URL has
+  // no category, so this is null and we fall back to `fromCat` below.
+  const urlCat: Category | "All" | null = useMemo(() => {
     if (seg[0] === "c" && seg[1]) return categoryFromPath(seg[1]);
+    if (seg[0] === "product" || seg[0] === "about" || seg[0] === "page") return null;
     return "All";
   }, [seg]);
+
+  // Opening a product from /c/books must keep "Books" for the crumb, the back
+  // link and the prev/next pager — so remember the category we came from.
+  const [fromCat, setFromCat] = useState<Category | "All">("All");
+  useEffect(() => {
+    if (urlCat) setFromCat(urlCat);
+  }, [urlCat]);
+
+  const cat: Category | "All" = urlCat ?? fromCat;
 
   // Trap scroll and move focus into the overlay while it is open.
   useEffect(() => {

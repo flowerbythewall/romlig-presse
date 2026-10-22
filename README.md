@@ -70,8 +70,8 @@ SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
 SHOPIFY_STOREFRONT_ACCESS_TOKEN=
 ```
 
-Map in the adapter: `handle` → `slug`, `variants[0].price.amount × 100` → `price`,
-`!variants[0].availableForSale` → `sold`.
+Map in the adapter: `handle` → `slug`, `variants[0].price.amount` → `price`
+(already major units, kept as-is), `!variants[0].availableForSale` → `sold`.
 
 ### Medusa v2
 
