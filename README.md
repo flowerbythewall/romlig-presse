@@ -125,6 +125,35 @@ lib/
   types.ts                Product, Policy, CartLine
 ```
 
+## Deploying (Vercel)
+
+The app builds as static + SSG routes, so Vercel needs no extra config. After
+importing the repo, set these in **Project → Settings → Environment Variables**:
+
+| Variable | Value | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_COMMERCE_PROVIDER` | `local` | Change to `shopify` / `medusa` once the backend is ready. Safe to expose. |
+| `SHOPIFY_STORE_DOMAIN` | `your-store.myshopify.com` | Hostname only, no `https://`, no trailing slash. Server-side only. |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | `shpat_…` | Server-side only — never prefix with `NEXT_PUBLIC_`. |
+| `MEDUSA_BACKEND_URL` | `https://your-medusa.com` | Server-side only. |
+| `MEDUSA_PUBLISHABLE_KEY` | `pk_…` | Public by design. |
+
+With only `NEXT_PUBLIC_COMMERCE_PROVIDER=local` set, the site deploys fully on
+seed data. The provider name is the one variable that *must* be `NEXT_PUBLIC_`,
+because `lib/commerce.ts` reads it while rendering — but the tokens are read only
+inside that server module and are never shipped to the browser.
+
+**Redeploy after changing env vars.** Vercel inlines them at build time, so an
+env change alone does not take effect — trigger a redeploy (or push a commit).
+
+### Verifying the deployment
+
+- `/` lists 12 items; `/c/books`, `/c/journals`, `/c/prints` filter correctly.
+- `/product/threshold` shows the overlay; an unknown slug returns 404.
+- The cart persists across reloads (`localStorage`).
+- With a real provider configured, prices must read as whole NOK (e.g. `NOK 420`),
+  not `NOK 42000` — that would mean the adapter's unit conversion regressed.
+
 ## Dependencies
 
 - `next` 15.5.28 — the latest patched 15.x (the 14.x line is end-of-life and still
