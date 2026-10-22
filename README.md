@@ -89,6 +89,11 @@ The request is pinned to `SHOPIFY_API_VERSION` in `lib/commerce.ts` — currentl
 this quarterly after checking the
 [versioning page](https://shopify.dev/docs/api/usage/versioning).
 
+Note that a stale pin does **not** fail loudly: Shopify falls forward to the
+oldest accessible stable version, so a forgotten bump can silently serve data
+from a much older API. Check the constant when product data looks wrong, not
+just when the build breaks.
+
 **The store's currency must be USD.** The adapter compares every product's
 `currencyCode` against `CURRENCY` in `lib/types.ts` and fails the build on a
 mismatch, rather than rendering a foreign price as dollars.
