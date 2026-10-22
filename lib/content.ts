@@ -14,7 +14,7 @@ export const ABOUT_ROWS: AboutRow[] = [
   {
     heading: "Shipping",
     body: "Orders ship within 2 working days.",
-    note: "Free shipping over NOK 600.",
+    note: "Free shipping over $600.",
   },
   {
     heading: "Returns",
@@ -42,7 +42,7 @@ export const POLICIES: Record<string, Policy> = {
       },
       {
         heading: "Rates",
-        body: "Norway NOK 89. Free shipping over NOK 600.",
+        body: "$89. Free shipping over $600.",
       },
       {
         heading: "Returns",
@@ -64,7 +64,7 @@ export const POLICIES: Record<string, Policy> = {
       },
       {
         heading: "Prices",
-        body: "All prices are in NOK and include VAT where applicable.",
+        body: "All prices are in US dollars and include tax where applicable.",
       },
       {
         heading: "Payment",

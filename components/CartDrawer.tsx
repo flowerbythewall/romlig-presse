@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "./CartProvider";
 import { CoverArt } from "./CoverArt";
-import { kr, shippingFor } from "@/lib/format";
+import { usd, shippingFor } from "@/lib/format";
 import { FREE_SHIPPING_OVER, type CartLine } from "@/lib/types";
 
 function Line({ line, onNavigate }: { line: CartLine; onNavigate: () => void }) {
@@ -17,7 +17,7 @@ function Line({ line, onNavigate }: { line: CartLine; onNavigate: () => void }) 
       <Link className="t" href={`/product/${product.slug}`} onClick={onNavigate}>
         {product.title}
       </Link>
-      <span className="p">{kr(qty * product.price)}</span>
+      <span className="p">{usd(qty * product.price)}</span>
       <span className="qty">
         <button onClick={() => setQty(product.id, qty - 1)} aria-label="Remove one">
           −
@@ -102,19 +102,19 @@ export default function CartDrawer({
             <>
               <div className="row">
                 <span>Subtotal</span>
-                <span>{kr(sum)}</span>
+                <span>{usd(sum)}</span>
               </div>
               <div className="row">
                 <span>Shipping</span>
-                <span>{ship ? kr(ship) : "Free"}</span>
+                <span>{ship ? usd(ship) : "Free"}</span>
               </div>
               <div className="row sum">
                 <span>Total</span>
-                <span>{kr(sum + ship)}</span>
+                <span>{usd(sum + ship)}</span>
               </div>
               <div className="hint">
                 {ship
-                  ? `${kr(FREE_SHIPPING_OVER - sum)} away from free shipping`
+                  ? `${usd(FREE_SHIPPING_OVER - sum)} away from free shipping`
                   : "You have free shipping"}
               </div>
               <div

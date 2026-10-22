@@ -96,8 +96,8 @@ Map in the adapter: `metadata.slug` → `slug`,
 
 `lib/types.ts` defines the `Product` shape both backends are mapped onto.
 
-**Prices are in major units (whole NOK)**, matching the seed data and `kr()` in
-`lib/format.ts`. Both backends already report major units — Shopify's
+**Prices are in major units (whole US dollars)**, matching the seed data and
+`usd()` in `lib/format.ts`. Both backends already report major units — Shopify's
 `price.amount` is a decimal string (`"420.00"`) and Medusa's `calculated_amount`
 is a plain number (`420`) — so neither adapter multiplies or divides. Note that
 Medusa **v1** used minor units (cents); v2 does not, and any `/ 100` here is a
@@ -172,10 +172,10 @@ to be down at build time would put fake products in front of real customers.
 - With a real provider configured, **prices must match what you entered in the
   backend exactly**. Check a price you know, not just the shape of the string.
   Two failure modes look different and both mean the unit conversion regressed:
-  - **Too small** — `NOK 3` for a `NOK 300` product: a `/ 100` is still being
-    applied to a price that is already in major units.
-  - **Too large** — `NOK 28000` for a `NOK 280` product: the raw value was shown
-    without the conversion the backend actually needs.
+  - **Too small** — `$3` for a `$300` product: a `/ 100` is still being applied to
+    a price that is already in major units.
+  - **Too large** — `$28000` for a `$280` product: the raw value was shown without
+    the conversion the backend actually needs.
 - Sold-out states appear only for variants that manage inventory, have zero
   stock, and do not allow backorders. If *nothing* ever shows as sold out, check
   the `fields` parameter on the products request (see `lib/commerce.ts`).

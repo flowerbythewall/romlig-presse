@@ -9,7 +9,7 @@ import { type Category } from "@/lib/types";
 import { useCart } from "./CartProvider";
 import { CoverArt } from "./CoverArt";
 import { ABOUT_ROWS, POLICIES } from "@/lib/content";
-import { catNo, categoryFromPath, esc, kr } from "@/lib/format";
+import { catNo, categoryFromPath, esc, usd } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
 type Overlay =
@@ -136,7 +136,7 @@ export default function ShopClient({ products }: { products: Product[] }) {
             style={{ animationDelay: `${i * 40}ms` }}
             href={`/product/${b.slug}`}
             scroll={false}
-            aria-label={`${b.title}, ${b.sold ? "sold" : kr(b.price)}`}
+            aria-label={`${b.title}, ${b.sold ? "sold" : usd(b.price)}`}
           >
             <div className="frame">
               <i />
@@ -172,7 +172,7 @@ export default function ShopClient({ products }: { products: Product[] }) {
                     Sold
                   </>
                 ) : (
-                  kr(b.price)
+                  usd(b.price)
                 )}
               </div>
             </div>
@@ -305,7 +305,7 @@ function ProductPage({
                   Sold
                 </>
               ) : (
-                kr(product.price)
+                usd(product.price)
               )}
             </div>
           </div>

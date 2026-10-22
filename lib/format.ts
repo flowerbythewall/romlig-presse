@@ -1,8 +1,15 @@
 import { CATEGORIES, FREE_SHIPPING_OVER, SHIPPING_FEE } from "./types";
 
-/** Prices are whole NOK (major units) — both adapters normalise to this. */
-export function kr(n: number): string {
-  return "NOK " + n.toLocaleString("en-GB");
+const USD = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  // The catalogue is priced in whole dollars, so no cents are shown.
+  maximumFractionDigits: 0,
+});
+
+/** Prices are whole US dollars (major units) — both adapters report major units. */
+export function usd(n: number): string {
+  return USD.format(n);
 }
 
 export function catNo(id: string): string {

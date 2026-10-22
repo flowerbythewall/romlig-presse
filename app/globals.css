@@ -35,7 +35,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 @keyframes bump{40%{transform:translateY(-3px);color:var(--dot)}}
 
 /* ---------- catalogue grid ---------- */
-.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:64px 32px;padding:56px var(--pad) 0}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:64px 32px;padding:28px var(--pad) 0}
 .work{display:block}
 
 /* cover with crop marks */
@@ -153,7 +153,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .header{flex-wrap:wrap;gap:6px 18px}
   .nav{order:3;width:100%;overflow-x:auto;scrollbar-width:none;padding-top:6px}
   .nav::-webkit-scrollbar{display:none}
-  .grid{padding-top:32px}
+  .grid{padding-top:16px}
   .frame{padding:8px}
   .label{margin:8px 8px 0}
   .footer{flex-direction:column;gap:14px}

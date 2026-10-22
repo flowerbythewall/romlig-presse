@@ -17,7 +17,7 @@ export type Product = {
   author: string;
   category: Category;
   year: number;
-  /** Price in whole NOK (major units) — see lib/commerce.ts for the provider mapping. */
+  /** Price in whole US dollars (major units) — see lib/commerce.ts for the provider mapping. */
   price: number;
   /** One-line format / production note. */
   format: string;

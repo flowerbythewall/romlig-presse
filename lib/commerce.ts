@@ -17,15 +17,15 @@
  *     npm i   — none required; GET /store/products with a publishable key
  *     env     MEDUSA_BACKEND_URL, MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID
  *     price   variants[0].calculated_price.calculated_amount — MAJOR units
- *             ("280" = NOK 280), keep as-is
+ *             ("280" = $280), keep as-is
  *     sold    manage_inventory && inventory_quantity <= 0 && !allow_backorder
  *     slug    metadata.slug
  *
- * Prices are stored in MAJOR units (whole NOK), matching lib/format.ts and the
- * seed data. Both backends already report major units — Shopify as a decimal
+ * Prices are stored in MAJOR units (whole dollars), matching lib/format.ts and
+ * the seed data. Both backends already report major units — Shopify as a decimal
  * string ("420.00"), Medusa as a plain number (420) — so neither adapter
  * multiplies or divides. Medusa v1 used minor units; v2 stores major units, so
- * any "/ 100" here is a bug (NOK 300 would render as NOK 3).
+ * any "/ 100" here is a bug ($300 would render as $3).
  *
  * Env vars live in .env.local and are only ever read here or in server
  * components — never ship a secret key to the browser.
@@ -142,7 +142,7 @@ async function listFromShopify(): Promise<Product[]> {
   return edges.map((e: any) => {
     const n = e.node;
     const v = n.variants.edges[0]?.node;
-    // price.amount is a decimal string in MAJOR units ("420.00" = NOK 420).
+    // price.amount is a decimal string in MAJOR units ("420.00" = $420).
     // The storefront renders major units (see lib/format.ts), so keep it as-is.
     const price = Math.round(Number(v?.price?.amount ?? 0));
     const rawCat = (n.productType ?? "").trim();
@@ -199,10 +199,10 @@ async function listFromMedusa(): Promise<Product[]> {
 
   return (json.products ?? []).map((p: any) => {
     const v = p.variants?.[0];
-    // Medusa v2 returns prices in MAJOR units — a NOK 280 variant comes back as
+    // Medusa v2 returns prices in MAJOR units — a $280 variant comes back as
     // 280, and the storefront renders major units (see lib/format.ts). Do NOT
-    // divide by 100: that is the v1 convention, and here it would turn NOK 300
-    // into NOK 3 and NOK 500 into NOK 5 while leaving other prices untouched.
+    // divide by 100: that is the v1 convention, and here it would turn $300
+    // into $3 and $500 into $5 while leaving other prices untouched.
     const price = Math.round(Number(v?.calculated_price?.calculated_amount ?? 0));
     const rawCat = (p.metadata?.category ?? "").trim();
     const category = (CATEGORIES.find((c) => c.toLowerCase() === rawCat.toLowerCase()) ??
