@@ -1,5 +1,11 @@
+import { FREE_SHIPPING_OVER, SHIPPING_FEE } from "./types";
+import { usd } from "./format";
 import type { AboutRow, Policy } from "./types";
 
+/**
+ * Shipping figures are generated from lib/types.ts so the copy cannot drift out
+ * of sync with the numbers the cart actually uses.
+ */
 export const ABOUT_ROWS: AboutRow[] = [
   {
     heading: "Visit",
@@ -14,7 +20,7 @@ export const ABOUT_ROWS: AboutRow[] = [
   {
     heading: "Shipping",
     body: "Orders ship within 2 working days.",
-    note: "Free shipping over $600.",
+    note: `Free shipping over ${usd(FREE_SHIPPING_OVER)}.`,
   },
   {
     heading: "Returns",
@@ -42,7 +48,7 @@ export const POLICIES: Record<string, Policy> = {
       },
       {
         heading: "Rates",
-        body: "$89. Free shipping over $600.",
+        body: `${usd(SHIPPING_FEE)}. Free shipping over ${usd(FREE_SHIPPING_OVER)}.`,
       },
       {
         heading: "Returns",
@@ -64,7 +70,7 @@ export const POLICIES: Record<string, Policy> = {
       },
       {
         heading: "Prices",
-        body: "All prices are in US dollars and include tax where applicable.",
+        body: "All prices are in US dollars. Sales tax, where applicable, is calculated at checkout.",
       },
       {
         heading: "Payment",

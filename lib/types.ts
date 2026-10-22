@@ -17,12 +17,17 @@ export type Product = {
   author: string;
   category: Category;
   year: number;
-  /** Price in whole US dollars (major units) — see lib/commerce.ts for the provider mapping. */
+  /** Price in US dollars, major units. May carry cents (24.99) — see lib/commerce.ts. */
   price: number;
   /** One-line format / production note. */
   format: string;
   /** Cover artwork: background colour, ink colour and a generated motif key. */
   art: { bg: string; fg: string; shape: Shape };
+  /**
+   * Commerce backend's own id for the purchasable variant (a Shopify variant
+   * GID). Required to build a checkout cart; absent for local and Medusa.
+   */
+  variantId?: string;
   isNew?: boolean;
   sold?: boolean;
   /** Shown on the product page when the item is sold out. */
@@ -48,7 +53,12 @@ export type AboutRow = { heading: string; body: string; note?: string };
 
 export type CartLine = { product: Product; qty: number };
 
-export const SHIPPING_FEE = 89;
-export const FREE_SHIPPING_OVER = 600;
-
 export const CATEGORIES: Category[] = ["Books", "Journals", "Prints"];
+
+/** The one currency the shop is priced and sold in. */
+export const CURRENCY = "USD";
+
+// PLACEHOLDERS — the seed catalogue is priced from the old NOK figures divided
+// by ten, and the shipping rates are guesses. Set real values before launch.
+export const SHIPPING_FEE = 8;
+export const FREE_SHIPPING_OVER = 60;

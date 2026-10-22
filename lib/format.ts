@@ -1,16 +1,23 @@
-import { CATEGORIES, FREE_SHIPPING_OVER, SHIPPING_FEE } from "./types";
+import { CATEGORIES, CURRENCY, FREE_SHIPPING_OVER, SHIPPING_FEE } from "./types";
 
-const USD = new Intl.NumberFormat("en-US", {
+const MONEY = new Intl.NumberFormat("en-US", {
   style: "currency",
-  currency: "USD",
-  // The catalogue is priced in whole dollars, so no cents are shown.
-  maximumFractionDigits: 0,
+  currency: CURRENCY,
+  // Two decimals, matching what Shopify shows on its own checkout page.
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
-/** Prices are whole US dollars (major units) — both adapters report major units. */
+/** US dollars, major units (24.99). */
 export function usd(n: number): string {
-  return USD.format(n);
+  return MONEY.format(n);
 }
+
+/**
+ * Money maths goes through integer cents so 59.98 never renders as
+ * 59.980000000000004 and `0.1 + 0.2`-style drift cannot reach the totals.
+ */
+export const toCents = (n: number) => Math.round(n * 100);
 
 export function catNo(id: string): string {
   const digits = id.replace(/\D/g, "") || "0";
@@ -18,11 +25,11 @@ export function catNo(id: string): string {
 }
 
 export function subtotal(lines: { price: number; qty: number }[]): number {
-  return lines.reduce((sum, l) => sum + l.price * l.qty, 0);
+  return lines.reduce((sum, l) => sum + toCents(l.price) * l.qty, 0) / 100;
 }
 
 export function shippingFor(sum: number): number {
-  return sum >= FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
+  return toCents(sum) >= toCents(FREE_SHIPPING_OVER) ? 0 : SHIPPING_FEE;
 }
 
 export function esc(s: string): string {
