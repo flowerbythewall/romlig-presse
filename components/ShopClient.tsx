@@ -209,8 +209,8 @@ export default function ShopClient({ products }: { products: Product[] }) {
               backHref={backHref}
             />
           )}
-          {overlay.kind === "about" && <AboutPage />}
-          {overlay.kind === "policy" && <PolicyPage slug={overlay.slug} />}
+          {overlay.kind === "about" && <AboutPage backHref={backHref} />}
+          {overlay.kind === "policy" && <PolicyPage slug={overlay.slug} backHref={backHref} />}
         </div>
       )}
 
@@ -398,14 +398,14 @@ function PolicyRows({ slug }: { slug: string }) {
   ));
 }
 
-function AboutPage() {
+function AboutPage({ backHref }: { backHref: string }) {
   return (
     <>
       <div className="pd-bar">
         <span className="crumb">
           <b>About</b>
         </span>
-        <Link className="close" href="/">
+        <Link className="close" href={backHref} scroll={false}>
           Close ×
         </Link>
       </div>
@@ -428,7 +428,7 @@ function AboutPage() {
   );
 }
 
-function PolicyPage({ slug }: { slug: string }) {
+function PolicyPage({ slug, backHref }: { slug: string; backHref: string }) {
   if (!POLICIES[slug]) {
     return (
       <>
@@ -436,7 +436,7 @@ function PolicyPage({ slug }: { slug: string }) {
           <span className="crumb">
             <b>Page not found</b>
           </span>
-          <Link className="close" href="/">
+          <Link className="close" href={backHref} scroll={false}>
             Close ×
           </Link>
         </div>
@@ -458,7 +458,7 @@ function PolicyPage({ slug }: { slug: string }) {
         <span className="crumb">
           <b>{title}</b>
         </span>
-        <Link className="close" href="/">
+        <Link className="close" href={backHref} scroll={false}>
           Close ×
         </Link>
       </div>

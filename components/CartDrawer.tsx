@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { COMMERCE_PROVIDER } from "@/lib/provider";
 import { useCart } from "./CartProvider";
 import { CoverArt } from "./CoverArt";
 import { usd, shippingFor } from "@/lib/format";
 import { FREE_SHIPPING_OVER, type CartLine } from "@/lib/types";
+
+/** Only a Shopify-backed shop can hand off to a real checkout. */
+const LIVE = COMMERCE_PROVIDER === "shopify";
 
 function Line({ line, onNavigate }: { line: CartLine; onNavigate: () => void }) {
   const { setQty, remove } = useCart();
@@ -43,6 +47,8 @@ export default function CartDrawer({
 }) {
   const { lines, subtotal: sum, clear } = useCart();
   const [thanks, setThanks] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -51,11 +57,38 @@ export default function CartDrawer({
 
   const ship = shippingFor(sum);
 
-  function checkout() {
-    // Demo only: no payment provider is wired up yet.
-    clear();
-    setThanks(true);
-    setTimeout(() => setThanks(false), 4000);
+  async function checkout() {
+    // Demo mode (local seed data): no payment provider is wired up, so just
+    // clear the cart and say thanks.
+    if (!LIVE) {
+      clear();
+      setThanks(true);
+      setTimeout(() => setThanks(false), 4000);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          lines: lines.map((l) => ({ id: l.product.id, qty: l.qty })),
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.url) {
+        throw new Error(json?.error ?? "Checkout failed.");
+      }
+      // Leave the cart in place: the buyer may abandon the Shopify page and come
+      // back, and the items are still theirs. Clearing it here would lose the
+      // order they were in the middle of paying for.
+      window.location.href = json.url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Checkout failed.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -126,8 +159,13 @@ export default function CartDrawer({
               >
                 <b style={{ width: `${Math.min(100, (sum / FREE_SHIPPING_OVER) * 100)}%` }} />
               </div>
-              <button className="btn" onClick={checkout}>
-                Checkout
+              {error ? (
+                <div className="hint" role="alert">
+                  {error}
+                </div>
+              ) : null}
+              <button className="btn" onClick={checkout} disabled={busy}>
+                {busy ? "Redirecting…" : LIVE ? "Checkout" : "Checkout (demo)"}
               </button>
             </>
           )}

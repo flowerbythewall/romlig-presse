@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { subtotal as sumLines } from "@/lib/format";
 import type { CartLine, Product } from "@/lib/types";
 
 type Cart = Record<string, number>;
@@ -43,7 +44,16 @@ export function CartProvider({
       if (raw) {
         const parsed: unknown = JSON.parse(raw);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          setCart(parsed as Cart);
+          // A hand-edited or older cart can hold nonsense quantities. Anything
+          // that is not a sane positive integer is dropped rather than being
+          // multiplied into the subtotal.
+          const clean: Cart = {};
+          for (const [id, q] of Object.entries(parsed as Record<string, unknown>)) {
+            if (typeof q === "number" && Number.isInteger(q) && q > 0 && q < 100) {
+              clean[id] = q;
+            }
+          }
+          setCart(clean);
         }
       }
     } catch {
@@ -73,7 +83,9 @@ export function CartProvider({
       .filter((l): l is CartLine => l !== null && l.qty > 0);
 
     const count = lines.reduce((n, l) => n + l.qty, 0);
-    const sub = lines.reduce((n, l) => n + l.product.price * l.qty, 0);
+    // Goes through integer cents (see lib/format.ts) so the displayed total
+    // matches what the buyer is charged.
+    const sub = sumLines(lines.map((l) => ({ price: l.product.price, qty: l.qty })));
 
     return {
       cart,
