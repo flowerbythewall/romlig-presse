@@ -213,6 +213,14 @@ back to the seed data. The seed catalogue is demo content with demo prices;
 shipping it because a backend happened to be down at build time would put fake
 products in front of real customers.
 
+This holds at runtime too, not just at build time. Pages re-render after the
+60-second cache expires, and if the backend is unreachable at that moment the
+render throws — so a backend outage takes the site down rather than degrading to
+demo products. That is the intended trade: a shop showing real prices must not
+fall back to invented ones. If you would rather serve the seed catalogue behind
+an unmistakable "demo data" banner during an outage, that is a deliberate change
+to make in `listProducts`, not a side effect.
+
 ### How fresh is the catalogue?
 
 Product requests are cached for 60 seconds (`revalidate: 60`, reported as
