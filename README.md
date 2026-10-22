@@ -6,11 +6,16 @@ components and reads its data from one commerce seam so you can attach Shopify o
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev          # http://localhost:3000
 npm run build && npm start
+npm run typecheck    # tsc --noEmit
 ```
 
 Requires Node 20.9+ (see `engines`). `npm run audit` should report **0 vulnerabilities**.
+
+There is no ESLint setup in this project. `npm run typecheck` is the static check;
+adding ESLint would pull in `fast-glob` → `micromatch` → `braces`, which currently
+has an unfixed high-severity advisory and would break the clean audit above.
 
 ## What changed from the single-file version
 
@@ -76,21 +81,27 @@ Map in the adapter: `handle` → `slug`, `variants[0].price.amount` → `price`
 ### Medusa v2
 
 ```bash
-MEDUSA_BACKEND_URL=http://localhost:9000
-MEDUSA_PUBLISHABLE_KEY=
+MEDUSA_BACKEND_URL=https://your-medusa.com
+MEDUSA_PUBLISHABLE_KEY=pk_…
+MEDUSA_REGION_ID=reg_…
 ```
+
+`MEDUSA_REGION_ID` is required: Medusa resolves prices per region, so without
+it the request falls back to the backend's default region and can return the
+wrong currency or price list. Find it in Medusa Admin → Settings → Regions.
 
 Map in the adapter: `metadata.slug` → `slug`,
 `variants[0].calculated_price.calculated_amount` → `price`,
-`inventory_quantity === 0 && !allow_backorder` → `sold`.
+`manage_inventory && inventory_quantity <= 0 && !allow_backorder` → `sold`.
 
 `lib/types.ts` defines the `Product` shape both backends are mapped onto.
 
 **Prices are in major units (whole NOK)**, matching the seed data and `kr()` in
-`lib/format.ts`. The two backends disagree, so each adapter normalises:
-Shopify's `price.amount` is already major (`"420.00"`), while Medusa's
-`calculated_price.calculated_amount` is minor (`28000` = NOK 280) and is divided
-by 100.
+`lib/format.ts`. Both backends already report major units — Shopify's
+`price.amount` is a decimal string (`"420.00"`) and Medusa's `calculated_amount`
+is a plain number (`420`) — so neither adapter multiplies or divides. Note that
+Medusa **v1** used minor units (cents); v2 does not, and any `/ 100` here is a
+bug.
 
 Neither adapter needs an SDK — both are plain `fetch`, so the app has no extra
 runtime dependencies. When you switch, only that mapping and the generated cover
@@ -132,27 +143,42 @@ importing the repo, set these in **Project → Settings → Environment Variable
 
 | Variable | Value | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_COMMERCE_PROVIDER` | `local` | Change to `shopify` / `medusa` once the backend is ready. Safe to expose. |
+| `NEXT_PUBLIC_COMMERCE_PROVIDER` | `local` | Change to `shopify` / `medusa` once the backend is ready. Must be set before `next build` — see below. |
 | `SHOPIFY_STORE_DOMAIN` | `your-store.myshopify.com` | Hostname only, no `https://`, no trailing slash. Server-side only. |
-| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | `shpat_…` | Server-side only — never prefix with `NEXT_PUBLIC_`. |
+| `SHOPIFY_STOREFRONT_ACCESS_TOKEN` | *(paste the token)* | Server-side only — never prefix with `NEXT_PUBLIC_`. This is the **Storefront API** token, not the Admin API token; a `shpat_…` value will be rejected with 401. |
 | `MEDUSA_BACKEND_URL` | `https://your-medusa.com` | Server-side only. |
 | `MEDUSA_PUBLISHABLE_KEY` | `pk_…` | Public by design. |
+| `MEDUSA_REGION_ID` | `reg_…` | Required — prices are resolved per region. From Medusa Admin → Settings → Regions. |
 
 With only `NEXT_PUBLIC_COMMERCE_PROVIDER=local` set, the site deploys fully on
-seed data. The provider name is the one variable that *must* be `NEXT_PUBLIC_`,
-because `lib/commerce.ts` reads it while rendering — but the tokens are read only
-inside that server module and are never shipped to the browser.
+seed data. The provider is read at module load in `lib/commerce.ts` (a server-only
+module), and every route is statically generated, so the provider choice is baked
+in at build time.
 
-**Redeploy after changing env vars.** Vercel inlines them at build time, so an
-env change alone does not take effect — trigger a redeploy (or push a commit).
+**Redeploy after changing env vars.** All routes are statically generated, so the
+catalogue is read during `next build` and the result is frozen into the deploy.
+Changing an env var alone does nothing — push a commit or trigger a redeploy.
+
+If a real provider is selected and the backend is unreachable or misconfigured,
+`next build` **fails** rather than falling back to the seed data. The seed
+catalogue is demo content with demo prices; shipping it because a backend happened
+to be down at build time would put fake products in front of real customers.
 
 ### Verifying the deployment
 
 - `/` lists 12 items; `/c/books`, `/c/journals`, `/c/prints` filter correctly.
 - `/product/threshold` shows the overlay; an unknown slug returns 404.
 - The cart persists across reloads (`localStorage`).
-- With a real provider configured, prices must read as whole NOK (e.g. `NOK 420`),
-  not `NOK 42000` — that would mean the adapter's unit conversion regressed.
+- With a real provider configured, **prices must match what you entered in the
+  backend exactly**. Check a price you know, not just the shape of the string.
+  Two failure modes look different and both mean the unit conversion regressed:
+  - **Too small** — `NOK 3` for a `NOK 300` product: a `/ 100` is still being
+    applied to a price that is already in major units.
+  - **Too large** — `NOK 28000` for a `NOK 280` product: the raw value was shown
+    without the conversion the backend actually needs.
+- Sold-out states appear only for variants that manage inventory, have zero
+  stock, and do not allow backorders. If *nothing* ever shows as sold out, check
+  the `fields` parameter on the products request (see `lib/commerce.ts`).
 
 ## Dependencies
 

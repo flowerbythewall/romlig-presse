@@ -5,10 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import CartDrawer from "./CartDrawer";
 import Nav from "./Nav";
-import { CATEGORIES, type Category } from "@/lib/types";
+import { type Category } from "@/lib/types";
 import { useCart } from "./CartProvider";
 import { CoverArt } from "./CoverArt";
-import { ABOUT_ROWS, POLICIES, POLICY_SLUGS } from "@/lib/content";
+import { ABOUT_ROWS, POLICIES } from "@/lib/content";
 import { catNo, categoryFromPath, esc, kr } from "@/lib/format";
 import type { Product } from "@/lib/types";
 
@@ -135,7 +135,8 @@ export default function ShopClient({ products }: { products: Product[] }) {
             className={`work rv${b.sold ? " sold" : ""}`}
             style={{ animationDelay: `${i * 40}ms` }}
             href={`/product/${b.slug}`}
-            aria-label={`${esc(b.title)}, ${b.sold ? "sold" : kr(b.price)}`}
+            scroll={false}
+            aria-label={`${b.title}, ${b.sold ? "sold" : kr(b.price)}`}
           >
             <div className="frame">
               <i />
@@ -327,11 +328,11 @@ function ProductPage({
       </div>
 
       <div className="pd-pager">
-        <Link href={`/product/${prev.slug}`}>
+        <Link href={`/product/${prev.slug}`} scroll={false}>
           <small>← PREVIOUS</small>
           <span>{prev.title}</span>
         </Link>
-        <Link href={`/product/${next.slug}`}>
+        <Link href={`/product/${next.slug}`} scroll={false}>
           <small>NEXT →</small>
           <span>{next.title}</span>
         </Link>
@@ -396,10 +397,6 @@ function PolicyRows({ slug }: { slug: string }) {
     </div>
   ));
 }
-
-const POLICY_TITLES: Record<string, string> = Object.fromEntries(
-  POLICY_SLUGS.map((s) => [s, POLICIES[s].title])
-);
 
 function AboutPage() {
   return (

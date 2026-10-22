@@ -15,15 +15,17 @@
  *
  *   MEDUSA v2
  *     npm i   — none required; GET /store/products with a publishable key
- *     env     MEDUSA_BACKEND_URL, MEDUSA_PUBLISHABLE_KEY
- *     price   variants[0].calculated_price.calculated_amount — MINOR units
- *             (28000 = NOK 280), so divide by 100
- *     sold    inventory_quantity === 0 && !allow_backorder
+ *     env     MEDUSA_BACKEND_URL, MEDUSA_PUBLISHABLE_KEY, MEDUSA_REGION_ID
+ *     price   variants[0].calculated_price.calculated_amount — MAJOR units
+ *             ("280" = NOK 280), keep as-is
+ *     sold    manage_inventory && inventory_quantity <= 0 && !allow_backorder
  *     slug    metadata.slug
  *
  * Prices are stored in MAJOR units (whole NOK), matching lib/format.ts and the
- * seed data, so every provider renders identically. The two backends disagree on
- * units — Shopify major, Medusa minor — and each adapter normalises to major.
+ * seed data. Both backends already report major units — Shopify as a decimal
+ * string ("420.00"), Medusa as a plain number (420) — so neither adapter
+ * multiplies or divides. Medusa v1 used minor units; v2 stores major units, so
+ * any "/ 100" here is a bug (NOK 300 would render as NOK 3).
  *
  * Env vars live in .env.local and are only ever read here or in server
  * components — never ship a secret key to the browser.
@@ -38,10 +40,6 @@ export const COMMERCE_PROVIDER: CommerceProvider =
 
 const LOG_PREFIX = "[romlig-presse]";
 
-function warn(msg: string) {
-  console.warn(`${LOG_PREFIX} ${msg}`);
-}
-
 /**
  * Read an env var at runtime, not at module load.
  *
@@ -54,10 +52,9 @@ function env(name: string): string | undefined {
 }
 
 function missing(names: string[], action: string): never {
-  // Never hard-fail the build over unset config: the shop should still render
-  // (on seed data) so you can see it before wiring a backend up.
-  warn(`Missing ${names.join(", ")} — ${action}. Falling back to the local seed data.`);
-  throw new CommerceConfigError(names.join(", "));
+  // Thrown, not warned-and-continued: with a real provider selected, missing
+  // config must fail the build rather than serve the demo catalogue.
+  throw new CommerceConfigError(`${names.join(", ")} — ${action}`);
 }
 
 /** Thrown when a real provider is selected but its config is incomplete. */
@@ -79,11 +76,19 @@ export async function listProducts(opts?: { revalidate?: boolean }): Promise<Pro
         return BOOKS;
     }
   } catch (err) {
-    if (err instanceof CommerceConfigError) return BOOKS;
-    // A real provider that failed should not take the shop down either —
-    // degrade to seed data rather than returning an empty grid.
-    warn(`Backend request failed: ${err instanceof Error ? err.message : String(err)}`);
-    return BOOKS;
+    const msg = err instanceof Error ? err.message : String(err);
+
+    // With a real provider configured, silently serving the demo catalogue is
+    // the worst outcome: every route is statically generated at build time, so a
+    // backend that was merely down during `next build` would ship fake products
+    // at fake prices with nothing but a warning in the build log. Fail the build
+    // instead — a deploy that cannot be trusted must not go out.
+    //
+    // `local` never reaches this branch (it returns BOOKS above), so there is no
+    // seed-data fallback to preserve here.
+    throw new Error(
+      `${LOG_PREFIX} Provider "${COMMERCE_PROVIDER}" is misconfigured or unreachable; refusing to build the shop from the local seed data. ${msg}`
+    );
   }
 }
 
@@ -165,15 +170,24 @@ async function listFromShopify(): Promise<Product[]> {
 async function listFromMedusa(): Promise<Product[]> {
   const base = env("MEDUSA_BACKEND_URL");
   const key = env("MEDUSA_PUBLISHABLE_KEY");
-  if (!base || !key) {
-    missing(["MEDUSA_BACKEND_URL", "MEDUSA_PUBLISHABLE_KEY"], "the Medusa adapter needs them");
+  // Prices are resolved per region, so without a region the request falls back
+  // to Medusa's default region — wrong currency or wrong price list for any
+  // shop with more than one region.
+  const regionId = env("MEDUSA_REGION_ID");
+  if (!base || !key || !regionId) {
+    missing(
+      ["MEDUSA_BACKEND_URL", "MEDUSA_PUBLISHABLE_KEY", "MEDUSA_REGION_ID"],
+      "the Medusa adapter needs them"
+    );
   }
 
-  // `*variants` is required for inventory fields (manage_inventory,
-  // inventory_quantity, allow_backorder) — without it the sold-out check below
-  // has nothing to read. `*variants.calculated_price` adds the price.
+  // `*variants.calculated_price` is the documented form: the leading `*` brings
+  // in the variant's own fields (manage_inventory, allow_backorder) and
+  // calculated_price adds the price for the region. `+variants.inventory_quantity`
+  // adds stock — it is NOT part of the default fields, so without it
+  // `inventory_quantity` is absent and nothing can ever be marked sold.
   const res = await fetch(
-    `${base}/store/products?limit=100&fields=*variants,*variants.calculated_price`,
+    `${base}/store/products?limit=100&region_id=${regionId}&fields=*variants.calculated_price,+variants.inventory_quantity`,
     {
       headers: { "x-publishable-api-key": key },
       next: { revalidate: 60 },
@@ -185,28 +199,24 @@ async function listFromMedusa(): Promise<Product[]> {
 
   return (json.products ?? []).map((p: any) => {
     const v = p.variants?.[0];
-    // Medusa stores prices in the currency's minor units, so a NOK 280 item
-    // arrives as 28000 — divide by 100 to match the storefront's major units.
-    //
-    // A price is treated as minor units only when it is an exact multiple of
-    // 100 (which major-unit NOK prices essentially never are, since NOK has no
-    // subunit). This keeps both shapes correct: 28000 -> 280, while 280 -> 280.
-    const rawAmount = Number(
-      v?.calculated_price?.calculated_amount ?? v?.prices?.[0]?.amount ?? 0
-    );
-    const price = rawAmount > 0 && rawAmount % 100 === 0 ? rawAmount / 100 : rawAmount;
+    // Medusa v2 returns prices in MAJOR units — a NOK 280 variant comes back as
+    // 280, and the storefront renders major units (see lib/format.ts). Do NOT
+    // divide by 100: that is the v1 convention, and here it would turn NOK 300
+    // into NOK 3 and NOK 500 into NOK 5 while leaving other prices untouched.
+    const price = Math.round(Number(v?.calculated_price?.calculated_amount ?? 0));
     const rawCat = (p.metadata?.category ?? "").trim();
     const category = (CATEGORIES.find((c) => c.toLowerCase() === rawCat.toLowerCase()) ??
       "Books") as Product["category"];
 
-    // Sold out is only true when the backend explicitly says so: a variant that
-    // manages inventory, has zero stock, and does not allow backorders. Missing
-    // inventory fields must NOT mark an item sold — otherwise every product with
-    // inventory tracking disabled would show as unavailable.
-    const managesInventory = v?.manage_inventory ?? p.manage_inventory ?? true;
+    // Sold out only when Medusa says so. `inventory_quantity` is returned only
+    // for variants whose manage_inventory is true, and only when the `fields`
+    // param above asks for it. When it is missing we deliberately do NOT mark
+    // the item sold: a shop-wide "everything is sold out" badge (and a disabled
+    // Add to cart on every product) is worse than a missing sold-out badge.
+    // A value of null means the variant has no inventory item linked.
     const stock = v?.inventory_quantity;
     const soldOut =
-      managesInventory &&
+      v?.manage_inventory === true &&
       typeof stock === "number" &&
       stock <= 0 &&
       v?.allow_backorder !== true;

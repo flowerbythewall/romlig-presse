@@ -36,7 +36,16 @@ export function CartProvider({
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setCart(JSON.parse(raw));
+      // `JSON.parse` returns null for the literal string "null", and
+      // `JSON.stringify(null)` writes exactly that — so a `null` round-trip is
+      // reachable, not just corruption. Guard the *parsed value*, not the parse:
+      // parsing "null" succeeds, so the catch below never sees it.
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          setCart(parsed as Cart);
+        }
+      }
     } catch {
       /* corrupt or unavailable storage — start empty */
     }
@@ -53,7 +62,9 @@ export function CartProvider({
   }, [cart, hydrated]);
 
   const value = useMemo(() => {
-    const ids = Object.keys(cart);
+    // `cart` is typed as a record but the guard in the restore effect is the
+    // only thing standing between a bad localStorage value and this line.
+    const ids = Object.keys(cart ?? {});
     const lines: CartLine[] = ids
       .map((id) => {
         const product = products.find((p) => p.id === id);
